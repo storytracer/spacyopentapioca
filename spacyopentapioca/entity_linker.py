@@ -1,10 +1,14 @@
+import concurrent.futures
 import logging
-import spacy
+
 import requests
+import spacy
+from spacy import util
 from spacy.language import Language
-from spacy.tokens import Span, Doc
+from spacy.tokens import Doc, Span
 
 log = logging.getLogger(__name__)
+
 
 @Language.factory('opentapioca',
                   default_config={"url": "https://opentapioca.org/api/annotate"})
@@ -27,13 +31,7 @@ class EntityLinker(object):
         Span.set_extension("nb_sitelinks", default=None, force=True)
         Span.set_extension("nb_statements", default=None, force=True)
 
-    def __call__(self, doc):
-        """Requests the OpenTapioca API. Attaches entities to spans and doc."""
-
-        # Post request to the OpenTapioca API
-        r = requests.post(url=self.url,
-                          data={'query': doc.text},
-                          headers={'User-Agent': 'spaCyOpenTapioca'})
+    def process_single_doc_after_call(self, doc: Doc, r) -> Doc:
         r.raise_for_status()
         data = r.json()
 
@@ -67,7 +65,7 @@ class EntityLinker(object):
                 span = doc.char_span(start, end, etype, ent_kb_id,
                                      alignment_mode='expand')
                 log.warning('The OpenTapioca-entity "%s" %s does not fit the span "%s" %s in spaCy. EXPANDED!',
-                            ent['tags'][0]['label'][0], (start,end), span.text, (span.start_char, span.end_char))
+                            ent['tags'][0]['label'][0], (start, end), span.text, (span.start_char, span.end_char))
             span._.annotations = ent
             span._.description = ent['tags'][0]['desc']
             span._.aliases = ent['tags'][0]['aliases']
@@ -90,3 +88,32 @@ class EntityLinker(object):
         # Attach all entities found by OpenTapioca to spans
         doc.spans['all_entities_opentapioca'] = ents
         return doc
+
+    def make_request(self, doc: Doc):
+        return requests.post(url=self.url,
+                             data={'query': doc.text},
+                             headers={'User-Agent': 'spaCyOpenTapioca'})
+
+    def __call__(self, doc):
+        """Requests the OpenTapioca API. Attaches entities to spans and doc."""
+
+        # Post request to the OpenTapioca API
+        r = self.make_request(doc)
+
+        return self.process_single_doc_after_call(doc, r)
+
+    def pipe(self, stream, batch_size=128):
+        """
+        It takes a stream of documents, and for each batch of documents, it makes a request to the API
+        for each document in the batch, and then yields the processed results of each document
+
+        :param stream: the stream of documents to be processed
+        :param batch_size: The number of documents to send to the API in a single request, defaults to
+        128 (optional)
+        """
+        for docs in util.minibatch(stream, size=batch_size):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                future_to_url = {executor.submit(
+                    self.make_request, doc): doc for doc in docs}
+                for doc, future in zip(docs, concurrent.futures.as_completed(future_to_url)):
+                    yield self.process_single_doc_after_call(doc, future.result())
