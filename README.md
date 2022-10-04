@@ -89,6 +89,30 @@ span._.nb_statements
 ```
 
 Note that spaCyOpenTapioca does a tiny processing of entities appearing in `doc.ents`. All entities returned by OpenTapioca can be found in `doc.spans['all_entities_opentapioca']`.
+### Batching
+
+Batched asynchronous requests to the OpenTapioca API via `nlp.pipe(List[str])`:
+```python
+import spacy
+nlp = spacy.blank("en")
+nlp.add_pipe('opentapioca')
+docs = nlp.pipe(
+    [
+        "Christian Drosten works in Germany.",
+        "Momofuku Ando was born in Japan.".
+    ]
+)
+for doc in docs:
+    for span in doc.ents:
+        print((span.text, span.kb_id_, span.label_, span._.description, span._.score))
+
+```
+```shell
+('Christian Drosten', 'Q1079331', 'PERSON', 'German virologist and university teacher', 3.6533377082098895)
+('Germany', 'Q183', 'LOC', 'sovereign state in Central Europe', 2.1099332471902863)
+('Momofuku Ando', 'Q317858', 'PERSON', 'Taiwanese-Japanese businessman', 3.6012208212234302)
+('Japan', 'Q17', 'LOC', 'sovereign state in East Asia, situated on an archipelago of five main and over 6,800 smaller islands', 2.349944834167907)
+```
 
 ## Local OpenTapioca
 
@@ -114,7 +138,7 @@ params = {"text": doc.text,
                     "end": ent.end_char,
                     "label": ent.label_,
                     "kb_id": ent.kb_id_,
-                    "kb_url": "https://www.wikidata.org/entity/" + ent.kb_id_} 
+                    "kb_url": "https://www.wikidata.org/entity/" + ent.kb_id_}
                    for ent in doc.ents],
           "title": None}
 spacy.displacy.serve(params, style="ent", manual=True)
