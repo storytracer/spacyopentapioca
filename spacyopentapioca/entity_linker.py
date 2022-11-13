@@ -115,5 +115,6 @@ class EntityLinker(object):
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 future_to_url = {executor.submit(
                     self.make_request, doc): doc for doc in docs}
-                for doc, future in zip(docs, concurrent.futures.as_completed(future_to_url)):
+                for future in concurrent.futures.as_completed(future_to_url):
+                    doc = future_to_url[future]
                     yield self.process_single_doc_after_call(doc, future.result())
