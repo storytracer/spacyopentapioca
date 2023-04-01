@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 
 @Language.factory('opentapioca',
-                  default_config={"url": "https://opentapioca.org/api/annotate"})
+                  default_config={"url": "https://opentapioca.wordlift.io/api/annotate"})
 class EntityLinker(object):
     """Sends raw data to the OpenTapioca API. Attaches entities to the document."""
 
