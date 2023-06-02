@@ -91,7 +91,7 @@ class EntityLinker(object):
 
     def make_request(self, doc: Doc):
         return requests.post(url=self.url,
-                             data={'query': doc.text},
+                             data={'query': doc.text, 'lc': doc.lang_},
                              headers={'User-Agent': 'spaCyOpenTapioca'})
 
     def __call__(self, doc):
